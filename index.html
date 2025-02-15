@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delhi Chaat Tour</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/x-icon" href="favicon.ico"> <!-- For older browsers -->
+    <link rel="shortcut icon" href="favicon.ico"> <!-- Legacy support -->
+    <link rel="icon" type="image/png" href="favicon.png">
+  </head>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <!-- Animate.css -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <style>
+    /* Global Styles */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Helvetica Neue', sans-serif;
+      background: #f0f0f0;
+    }
+    /* Header */
+    #header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #ddd; /* light gray background */
+      text-align: center;
+      font-size: 36px;
+      padding: 15px 0;
+      z-index: 1500;
+      border-bottom: 1px solid #ccc;
+    }
+    /* Map Container */
+    #map {
+      position: absolute;
+      top: 70px; /* below header */
+      bottom: 0;
+      width: 100%;
+    }
+    /* Sidebar */
+    #sidebar {
+      position: fixed;
+      top: 70px;
+      left: -300px; /* off-canvas initially */
+      width: 300px;
+      height: calc(100% - 70px);
+      background: #555; /* gray background */
+      color: #fff;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      overflow-y: auto;
+      z-index: 1600;
+      padding: 20px;
+    }
+    #sidebar h2 {
+      margin-top: 0;
+    }
+    #stall-details, #stall-ratings {
+      margin-bottom: 15px;
+    }
+    #directions-button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      width: 100%;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    /* Hamburger Menu */
+    #hamburger {
+      position: fixed;
+      top: 20px;
+      left: 15px;
+      width: 40px;
+      height: 40px;
+      background: #555;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1700;
+    }
+    #hamburger span {
+      display: block;
+      width: 25px;
+      height: 3px;
+      background: #fff;
+    }
+    /* Custom Numbered Markers */
+    .custom-marker {
+      width: 30px;
+      height: 30px;
+      line-height: 30px;
+      border-radius: 50%;
+      text-align: center;
+      color: #fff;
+      font-weight: bold;
+      box-shadow: 0 0 3px rgba(0,0,0,0.5);
+    }
+    /* Satellite Toggle Button */
+    #satellite-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 1800;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    /* Hide the default Leaflet Routing instructions panel */
+    .leaflet-routing-container {
+      display: none !important;
+    }
+    /* Optional: Hide Leaflet Attribution */
+    .leaflet-control-attribution {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div id="header" class="animate__animated animate__fadeInDown">Delhi Chaat Tour</div>
+  
+  <!-- Hamburger Menu -->
+  <div id="hamburger" onclick="toggleSidebar()">
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+  
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <h2 id="stall-name">Chaat Stall</h2>
+    <div id="stall-details">
+      <p id="stall-description">Detailed description will appear here.</p>
+    </div>
+    <div id="stall-ratings">
+      <strong>Rating:</strong> <span id="stall-rating">N/A</span>
+    </div>
+    <button id="directions-button" onclick="openDirections()">Get Directions</button>
+  </div>
+  
+  <!-- Map Container -->
+  <div id="map"></div>
+  
+  <!-- Satellite Toggle Button -->
+  <button id="satellite-toggle" onclick="toggleSatelliteView()">SAT</button>
+  
+  <!-- Include Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Include Leaflet Routing Machine JS -->
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+  
+  <script>
+    /**********************************
+     * Data for Chaat Stalls
+     **********************************/
+    const chaatStalls = [
+      { 
+        name: "Sita Ram Diwan Chand", 
+        description: "Famous for its iconic chole bhature and spicy aloo tikki chaat.", 
+        extendedDescription: "Sita Ram Diwan Chand is known not only for its mouth-watering chole bhature but also for its timeless legacy in the bustling lanes of Chandni Chowk. The blend of spices and the traditional recipe offer a genuine taste of Old Delhi.", 
+        coords: [28.6562, 77.2300],
+        rating: "4.3/5 on Google Maps"
+      },
+      { 
+        name: "Haldiram’s, Kashmiri Gate", 
+        description: "Celebrated for its hygienic papdi chaat and dahi puri.", 
+        extendedDescription: "Haldiram’s at Kashmiri Gate brings a contemporary twist to traditional chaat. With a perfect balance of tangy and spicy flavors, their papdi chaat has won the hearts of both locals and visitors.", 
+        coords: [28.6795, 77.2211],
+        rating: "4.1/5 on TripAdvisor"
+      },
+      { 
+        name: "Bikanervala, Connaught Place", 
+        description: "Known for an extensive menu of chaats and sweets.", 
+        extendedDescription: "Bikanervala in Connaught Place offers an expansive menu that fuses royal recipes with street food charm. Their chaats and sweets, prepared with attention to detail, are a delight for every food connoisseur.", 
+        coords: [28.6330, 77.2167],
+        rating: "4.0/5 on Zomato"
+      },
+      { 
+        name: "Delhi Chaat Corner, Karol Bagh", 
+        description: "Famed for tangy and spicy chaat combos.", 
+        extendedDescription: "Located in Karol Bagh, Delhi Chaat Corner is renowned for its vibrant and authentic taste. The unique chaat combos capture the true essence of Delhi’s street food, making it a local favorite.", 
+        coords: [28.6510, 77.2083],
+        rating: "4.2/5 on Google Maps"
+      },
+      { 
+        name: "Chaat on the Go, Khan Market", 
+        description: "Innovative variations on classic chaats.", 
+        extendedDescription: "Chaat on the Go redefines traditional recipes with a modern twist in Khan Market. The innovative presentation and commitment to quality have made it popular among young food enthusiasts.", 
+        coords: [28.5500, 77.2083],
+        rating: "4.0/5 on TripAdvisor"
+      },
+      { 
+        name: "Chatpata Adda, Lajpat Nagar", 
+        description: "Serves crunchy, spicy, and tangy chaat plates.", 
+        extendedDescription: "Chatpata Adda in Lajpat Nagar serves a robust mix of flavors that truly represent Delhi’s culinary heritage. Its chaat plates are a perfect blend of tradition and taste, drawing crowds at every hour.", 
+        coords: [28.5530, 77.2430],
+        rating: "4.3/5 on Zomato"
+      },
+      { 
+        name: "The Chaat Factory, Saket", 
+        description: "Modern fusion of classic chaats.", 
+        extendedDescription: "The Chaat Factory in Saket offers a unique fusion experience where traditional recipes meet contemporary culinary techniques. Its creative ambiance and innovative dishes make it a hotspot for food lovers.", 
+        coords: [28.5345, 77.1910],
+        rating: "4.4/5 on Google Maps"
+      },
+      { 
+        name: "Desi Chaat House, Rajouri Garden", 
+        description: "Authentic North Indian street chaat.", 
+        extendedDescription: "Desi Chaat House in Rajouri Garden is dedicated to serving authentic North Indian street chaat with a rich taste profile. Every bite evokes the nostalgia of traditional flavors.", 
+        coords: [28.6745, 77.1550],
+        rating: "4.2/5 on TripAdvisor"
+      },
+      { 
+        name: "Urban Chaat, Gurgaon", 
+        description: "Gourmet interpretations of traditional chaats.", 
+        extendedDescription: "Urban Chaat in Gurgaon offers a fresh take on traditional recipes by blending gourmet techniques with classic ingredients. Its unique flavor combinations set a new standard for street food.", 
+        coords: [28.4595, 77.0266],
+        rating: "4.1/5 on Zomato"
+      },
+      { 
+        name: "Royal Chaat, Noida", 
+        description: "Regal recipes with rich flavors.", 
+        extendedDescription: "Royal Chaat in Noida elevates everyday street food with its regal recipes and luxurious twist. The sumptuous presentation and deep flavors create an unforgettable dining experience.", 
+        coords: [28.5355, 77.3910],
+        rating: "4.5/5 on Google Maps"
+      }
+    ];
+    
+    // Define the route order (circular route returning to start)
+    const routeOrder = [0,1,2,3,4,5,6,7,8,9,0];
+    
+    /**********************************
+     * Map Initialization and Tile Layers
+     **********************************/
+    // Minimal and Satellite tile layers
+    const minimalLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap contributors, © CARTO'
+    });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri'
+    });
+    
+    // Initialize the map with minimal layer and zoom control
+    const map = L.map('map', { zoomControl: false, tap: true }).setView([28.6139, 77.2090], 11);
+    minimalLayer.addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    
+    // Toggle Satellite View
+    let isSatellite = false;
+    function toggleSatelliteView() {
+      if(isSatellite) {
+        map.removeLayer(satelliteLayer);
+        minimalLayer.addTo(map);
+        isSatellite = false;
+      } else {
+        map.removeLayer(minimalLayer);
+        satelliteLayer.addTo(map);
+        isSatellite = true;
+      }
+    }
+    
+    /**********************************
+     * Marker Creation with Numbered Icons
+     **********************************/
+    function createNumberedIcon(number, color) {
+      let bgColor;
+      if(color === 'green') { bgColor = '#28a745'; }
+      else if(color === 'red') { bgColor = '#dc3545'; }
+      else { bgColor = '#007bff'; }
+      return L.divIcon({
+        html: `<div class="custom-marker" style="background-color: ${bgColor};">${number}</div>`,
+        className: '',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -30]
+      });
+    }
+    
+    const markers = L.layerGroup().addTo(map);
+    let selectedStall = null;
+    
+    chaatStalls.forEach((stall, index) => {
+      let color = 'default';
+      if(index === 0) { color = 'green'; }
+      else if(index === chaatStalls.length - 1) { color = 'red'; }
+      
+      const icon = createNumberedIcon(index + 1, color);
+      const marker = L.marker(stall.coords, { icon: icon }).addTo(markers);
+      marker.bindPopup(
+        `<div class="marker-popup animate__animated animate__fadeIn">
+          <strong>${stall.name}</strong><br>${stall.description}
+        </div>`
+      );
+      marker.on('click', () => { updateSidebar(stall); });
+    });
+    
+    /**********************************
+     * Routing with Leaflet Routing Machine (Actual Roads)
+     **********************************/
+    const waypoints = routeOrder.map(i => L.latLng(...chaatStalls[i].coords));
+    L.Routing.control({
+      waypoints: waypoints,
+      router: new L.Routing.OSRMv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1'
+      }),
+      lineOptions: {
+        styles: [{ color: 'blue', weight: 4, opacity: 0.7, dashArray: '5, 10' }]
+      },
+      createMarker: function(i, wp, nWps) { return null; },
+      addWaypoints: false,
+      routeWhileDragging: false,
+      fitSelectedRoutes: true,
+      showAlternatives: false
+    }).addTo(map);
+    
+    /**********************************
+     * Sidebar and Directions Functionality
+     **********************************/
+    function updateSidebar(stall) {
+      selectedStall = stall;
+      document.getElementById('stall-name').innerText = stall.name;
+      document.getElementById('stall-description').innerText = stall.extendedDescription;
+      document.getElementById('stall-rating').innerText = stall.rating;
+      
+      // Display Get Directions if geolocation is available
+      if(navigator.geolocation) {
+        document.getElementById('directions-button').style.display = 'block';
+      } else {
+        document.getElementById('directions-button').style.display = 'none';
+      }
+    }
+    
+    function openDirections() {
+      if(!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        const destLat = selectedStall.coords[0];
+        const destLng = selectedStall.coords[1];
+        const directionsURL = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${destLat},${destLng}&travelmode=walking`;
+        window.open(directionsURL, '_blank');
+      }, function() {
+        alert("Unable to retrieve your location for directions.");
+      });
+    }
+    
+    /**********************************
+     * Sidebar Toggle & Touch Gestures
+     **********************************/
+    let sidebarOpen = false;
+    function toggleSidebar(forceClose) {
+      const sidebar = document.getElementById('sidebar');
+      if(forceClose || sidebarOpen) {
+        sidebar.classList.remove('animate__slideInLeft');
+        sidebar.classList.add('animate__animated', 'animate__slideOutLeft');
+        setTimeout(() => {
+          sidebar.style.left = '-300px';
+          sidebar.classList.remove('animate__animated', 'animate__slideOutLeft');
+        }, 500);
+        sidebarOpen = false;
+      } else {
+        sidebar.style.left = '0';
+        sidebar.classList.remove('animate__slideOutLeft');
+        sidebar.classList.add('animate__animated', 'animate__slideInLeft');
+        setTimeout(() => {
+          sidebar.classList.remove('animate__animated', 'animate__slideInLeft');
+        }, 500);
+        sidebarOpen = true;
+      }
+    }
+    
+    let touchStartX = 0, touchEndX = 0;
+    const threshold = 50;
+    const sidebarElem = document.getElementById('sidebar');
+    sidebarElem.addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].screenX;
+    });
+    sidebarElem.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      if(touchStartX - touchEndX > threshold) {
+        toggleSidebar(true);
+      }
+    });
+    const mapElem = document.getElementById('map');
+    mapElem.addEventListener('touchstart', e => {
+      if(e.changedTouches[0].screenX < 30) {
+        touchStartX = e.changedTouches[0].screenX;
+      }
+    });
+    mapElem.addEventListener('touchend', e => {
+      if(touchStartX) {
+        touchEndX = e.changedTouches[0].screenX;
+        if(touchEndX - touchStartX > threshold && !sidebarOpen) {
+          toggleSidebar();
+        }
+        touchStartX = 0;
+      }
+    });
+    
+    window.addEventListener('resize', () => { map.invalidateSize(); });
+  </script>
+</body>
+</html>
