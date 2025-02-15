@@ -21,7 +21,7 @@ A sleek and interactive web app that maps out the **top 10 chaat stalls** in Del
 ## **Setup Instructions**
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/delhi-chaat-tour.git
+   git clone https://github.com/iamjohnwatson/delhi-chaat-tour.git
    cd delhi-chaat-tour
    ```
 2. Open `index.html` in a browser.
